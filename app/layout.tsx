@@ -27,7 +27,7 @@ export default function RootLayout({
   return (
     <html
       lang="es"
-      className={`${manrope.variable} ${inter.variable} antialiased`}
+      className={`light ${manrope.variable} ${inter.variable} antialiased`}
     >
       <body className="min-h-screen">{children}</body>
     </html>

@@ -1,7 +1,5 @@
+import { redirect } from "next/navigation";
+
 export default function Home() {
-  return (
-    <main className="min-h-screen p-8">
-      {/* Contenido en blanco */}
-    </main>
-  );
+  redirect("/login");
 }

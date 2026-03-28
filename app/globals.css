@@ -72,6 +72,62 @@
   --color-hydro-outline-variant: #c1c6d6;
 
   --color-hydro-error: #ba1a1a;
+
+  /* Theme tokens from Customer Screen Design (MD3) */
+  --color-surface-bright: #f7f9fb;
+  --color-on-surface: #191c1e;
+  --color-tertiary-container: #a36700;
+  --color-surface-container-highest: #e0e3e5;
+  --color-secondary-fixed: #6ffbbe;
+  --color-surface-container-high: #e6e8ea;
+  --color-on-primary-container: #fefcff;
+  --color-on-primary: #ffffff;
+  --color-surface-tint: #005db6;
+  --color-outline-variant: #c1c6d6;
+  --color-primary-container: #0073df;
+  --color-surface-container-low: #f2f4f6;
+  --color-on-error-container: #93000a;
+  --color-inverse-primary: #a9c7ff;
+  --color-on-surface-variant: #414753;
+  --color-surface-variant: #e0e3e5;
+  --color-on-secondary-fixed: #002113;
+  --color-on-tertiary-fixed: #2a1700;
+  --color-tertiary-fixed: #ffddb8;
+  --color-primary-fixed: #d6e3ff;
+  --color-secondary: #006c49;
+  --color-on-secondary-fixed-variant: #005236;
+  --color-primary-fixed-dim: #a9c7ff;
+  --color-surface: #f7f9fb;
+  --color-on-secondary: #ffffff;
+  --color-error: #ba1a1a;
+  --color-outline: #717785;
+  --color-on-tertiary-container: #fffbff;
+  --color-on-tertiary-fixed-variant: #653e00;
+  --color-secondary-fixed-dim: #4edea3;
+  --color-tertiary-fixed-dim: #ffb95f;
+  --color-primary: #005bb2;
+  --color-on-tertiary: #ffffff;
+  --color-inverse-surface: #2d3133;
+  --color-inverse-on-surface: #eff1f3;
+  --color-surface-container-lowest: #ffffff;
+  --color-secondary-container: #6cf8bb;
+  --color-on-secondary-container: #00714d;
+  --color-on-error: #ffffff;
+  --color-surface-dim: #d8dadc;
+  --color-on-primary-fixed: #001b3d;
+  --color-error-container: #ffdad6;
+  --color-tertiary: #825100;
+  --color-surface-container: #eceef0;
+  --color-on-primary-fixed-variant: #00468b;
+}
+
+@utility glass-effect {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+@utility signature-gradient {
+  background: linear-gradient(135deg, #005bb2 0%, #0073df 100%);
 }
 
 :root {

@@ -10,9 +10,9 @@ import {
   MapPin, 
   ChevronRight, 
   CheckCircle2, 
-  ArrowRight,
   Edit,
-  Trash2
+  Trash2,
+  Package
 } from "lucide-react";
 
 import {
@@ -23,41 +23,47 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-// 1. Definición estructurada de un Cliente de acuerdo a las nuevas instrucciones
-// Eliminamos status porque se puede calcular en base a balance
+// 1. Ampliación del tipo Customer con la nueva lógica bidones prestados
 interface Customer {
   id: number;
   name: string;
   address: string;
   phone: string;
   balance: number;
-  avatarUrl?: string; // Solo para estilos visuales
-  tags?: string[]; // Solo para estilos visuales
-  isWide?: boolean; // Solo para estilos visuales
+  borrowedContainers: number; // Envases adeudados
+  allowContainerLoan: boolean; // ¿Se le fían envases?
+  avatarUrl?: string;
+  tags?: string[];
+  isWide?: boolean;
 }
 
-// 2. Clientes por defecto (si localStorage está vacío)
 const initialCustomers: Customer[] = [
   {
     id: 1,
     name: "Alejandro Mendoza",
     address: "Av. Libertad 452, Sector Norte",
     phone: "099 123 4567",
-    balance: 1450.00
+    balance: 1450.00,
+    borrowedContainers: 3,
+    allowContainerLoan: true
   },
   {
     id: 2,
     name: "Sofía Villalobos",
     address: "Calle Los Pinos #12, Residencial",
     phone: "098 765 4321",
-    balance: 0.00
+    balance: 0.00,
+    borrowedContainers: 0,
+    allowContainerLoan: true
   },
   {
     id: 3,
     name: "Roberto García",
     address: "Industrial Park B-20, Zona Industrial",
     phone: "097 654 3210",
-    balance: 320.50
+    balance: 320.50,
+    borrowedContainers: 0,
+    allowContainerLoan: false // A este cliente no se le prestan, se le cobran.
   },
   {
     id: 4,
@@ -65,6 +71,8 @@ const initialCustomers: Customer[] = [
     address: "Plaza Central #105, Centro Histórico",
     phone: "02 223 4567",
     balance: 5800.00,
+    borrowedContainers: 45,
+    allowContainerLoan: true,
     avatarUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuCzXRBLnOZ68eKyZv1E1m5c75FgnrpsR6Do04jTzR5fOZySvJBuYbhu2ZvrmN7iSPYNiQu5-s6pPN-q3bqCsGCiGeqofWoBnUxLbZh2ioyR7nOnC3OMKaRm8_KRGgn4oBTxH2f-w8nLpuQW3Hgf74JRP5JV2oc4I6R6JNSzS9O1Pt5rKJOZz5SUWI9Y7UeadbOWkJqFRDiLRhAC6I6GphMKf5JYD4j6bk6kHQAmBfZqPsPjWASlCeNI1Zsz8PEowr-B-XH7x52EhqM-",
     tags: ["MAYORISTA", "RUTA 04"],
     isWide: true
@@ -74,14 +82,15 @@ const initialCustomers: Customer[] = [
     name: "Mariana Soto",
     address: "Condominio El Prado, Torre A-102",
     phone: "099 888 7777",
-    balance: 0.00
+    balance: 0.00,
+    borrowedContainers: 2,
+    allowContainerLoan: true
   }
 ];
 
 const STORAGE_KEY = "@hydroflow_customers";
 
 export default function CustomersPage() {
-  // Estado para la hidratación segura de Next.js (evita Mismatch HTML)
   const [isMounted, setIsMounted] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
 
@@ -93,29 +102,27 @@ export default function CustomersPage() {
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [newAllowContainerLoan, setNewAllowContainerLoan] = useState<boolean>(true); // Por defecto se le fían
   const [errorMsg, setErrorMsg] = useState("");
 
   // ============================================
   // EFECTOS PARA PERSISTENCIA CON LOCALSTORAGE
   // ============================================
-  
-  // 1. Cargar datos al iniciar la página
   useEffect(() => {
-    setIsMounted(true); // Indica que ya estamos en el lado del cliente (Navegador)
+    setIsMounted(true);
     const storedData = localStorage.getItem(STORAGE_KEY);
     
     if (storedData) {
       try {
         setCustomers(JSON.parse(storedData));
       } catch (error) {
-        setCustomers(initialCustomers); // Fallback en caso de corrupción
+        setCustomers(initialCustomers); 
       }
     } else {
-      setCustomers(initialCustomers); // Usar datos de ejemplo si es primera vez
+      setCustomers(initialCustomers); 
     }
   }, []);
 
-  // 2. Guardar datos en localStorage automáticamente cuando customers cambia
   useEffect(() => {
     if (isMounted) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
@@ -127,27 +134,27 @@ export default function CustomersPage() {
   // ============================================
 
   const handleOpenCreateModal = () => {
-    // Modo CREAR
     setEditingCustomer(null);
     setNewName("");
     setNewAddress("");
     setNewPhone("");
+    setNewAllowContainerLoan(true); // Siempre inicia true
     setErrorMsg("");
     setIsModalOpen(true);
   };
 
   const handleOpenEditModal = (customer: Customer) => {
-    // Modo EDITAR: Precargamos la información
     setEditingCustomer(customer);
     setNewName(customer.name);
     setNewAddress(customer.address);
     setNewPhone(customer.phone);
+    // Recuperar preferencia de fianza antigua o asignar true si no la tiene
+    setNewAllowContainerLoan(customer.allowContainerLoan !== false); 
     setErrorMsg("");
     setIsModalOpen(true);
   };
 
   const handleDeleteCustomer = (id: number, name: string) => {
-    // Confirmación nativa usando window.confirm
     const isConfirmed = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente a "${name}"?`);
     if (isConfirmed) {
       setCustomers(prev => prev.filter(c => c.id !== id));
@@ -157,40 +164,39 @@ export default function CustomersPage() {
   const handleSaveForm = () => {
     setErrorMsg("");
     
-    // Validar espacios vacíos
     if (!newName.trim() || !newAddress.trim() || !newPhone.trim()) {
-      setErrorMsg("Por favor, completa todos los campos (Nombre, Dirección y Teléfono).");
+      setErrorMsg("Por favor, completa todos los campos.");
       return;
     }
 
     if (editingCustomer) {
-      // Flujo de UPDATE (Reemplazar)
       setCustomers(prev => prev.map((c) => {
         if (c.id === editingCustomer.id) {
           return {
             ...c,
             name: newName.trim(),
             address: newAddress.trim(),
-            phone: newPhone.trim()
-            // El balance se mantiene intacto al editar
+            phone: newPhone.trim(),
+            allowContainerLoan: newAllowContainerLoan
+            // El balance y prestados se mantienen intactos
           };
         }
         return c;
       }));
     } else {
-      // Flujo de CREATE (Agregar)
       const newCustomer: Customer = {
         id: Date.now(),
         name: newName.trim(),
         address: newAddress.trim(),
         phone: newPhone.trim(),
-        balance: 0 // Según requerimiento inicia en 0 y solo se puede modificar desde otro módulo
+        balance: 0,
+        borrowedContainers: 0,
+        allowContainerLoan: newAllowContainerLoan
       };
       
       setCustomers((prev) => [newCustomer, ...prev]);
     }
     
-    // Cerrar modal
     setIsModalOpen(false);
   };
 
@@ -198,14 +204,12 @@ export default function CustomersPage() {
   // UTILIDADES
   // ============================================
   
-  // Condicional de status al vuelo: Deuda si el saldo > 0
   const isDebt = (balance: number) => balance > 0;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return amount.toLocaleString('es-EC', { style: 'currency', currency: 'USD' });
   };
 
-  // Prevenir mostrar UI no-hidratada para evitar Error 418 de Next.js Mismatch
   if (!isMounted) return null;
 
   return (
@@ -225,10 +229,6 @@ export default function CustomersPage() {
             <Filter className="w-4 h-4" />
             Filtrar
           </button>
-          <button className="bg-surface-container-low px-4 py-2.5 rounded-full flex items-center gap-2 text-sm font-semibold hover:bg-surface-container-high transition-colors">
-            <CircleDollarSign className="w-4 h-4" />
-            Deudas
-          </button>
           <button 
             onClick={handleOpenCreateModal}
             className="signature-gradient text-white px-6 py-2.5 rounded-full flex items-center gap-2 text-sm font-bold shadow-md shadow-primary/20 active:scale-95 transition-transform hover:shadow-primary/40"
@@ -245,13 +245,10 @@ export default function CustomersPage() {
         {customers.map((customer) => {
           const hasDebt = isDebt(customer.balance);
           
-          /* ==========================================================
-             VARIANTE 1: Tarjeta Extendida (Distribuidora)
-             ========================================================== */
           if (customer.isWide) {
             return (
-              <div key={customer.id} className="bg-surface-container-lowest p-6 rounded-[1.5rem] shadow-sm md:col-span-2 hover:shadow-md transition-shadow group flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                <div className="flex items-center gap-6 w-full">
+              <div key={customer.id} className="bg-surface-container-lowest p-6 rounded-[1.5rem] shadow-sm md:col-span-2 hover:shadow-md transition-shadow group flex flex-col sm:flex-row sm:items-center justify-between gap-6 relative overflow-hidden">
+                <div className="flex items-center gap-6 w-full z-10">
                   <div className="h-20 w-20 shrink-0 rounded-3xl bg-primary/5 flex items-center justify-center text-primary overflow-hidden">
                     {customer.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -273,37 +270,37 @@ export default function CustomersPage() {
                         </button>
                       </div>
                     </div>
-                    <div className="flex flex-col gap-1 text-on-surface-variant mt-1 mb-3">
+                    
+                    {/* Prestamos en empresa */}
+                    <div className="flex items-center gap-3 mt-1.5 mb-2">
+                      {!customer.allowContainerLoan && (
+                         <span className="px-2 py-0.5 text-[9px] uppercase tracking-widest font-black rounded-sm border border-orange-500/20 text-orange-600 bg-orange-500/10">No Préstamos</span>
+                      )}
+                      {customer.borrowedContainers > 0 && (
+                        <div className="flex items-center gap-1 text-on-surface-variant font-bold text-xs bg-surface-container-low px-2 py-1 rounded-md">
+                          <Package className="w-3.5 h-3.5 text-primary" />
+                          <span>{customer.borrowedContainers} Prestados</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col gap-1 text-on-surface-variant">
                       <div className="flex items-center gap-2">
                         <MapPin className="w-4 h-4 shrink-0" />
                         <span className="text-sm font-medium line-clamp-1">{customer.address}</span>
                       </div>
-                      <span className="text-xs font-medium bg-surface-container-low px-2 py-1 rounded-md mt-1 self-start">{customer.phone}</span>
                     </div>
-                    {customer.tags && (
-                      <div className="flex gap-2">
-                        {customer.tags.map(tag => (
-                          <span key={tag} className="px-2 py-0.5 bg-primary/10 text-primary text-[10px] font-bold rounded">{tag}</span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
-                <div className="bg-surface-container-low p-5 rounded-2xl flex flex-col sm:items-end w-full sm:w-auto min-w-[200px]">
+                <div className="bg-surface-container-low p-5 rounded-2xl flex flex-col sm:items-end w-full sm:w-auto min-w-[200px] z-10">
                   <p className="text-[10px] font-bold text-on-surface-variant uppercase tracking-widest mb-1">Saldo Pendiente</p>
                   <p className="text-3xl font-black text-tertiary font-[var(--font-manrope)] tracking-tight">{formatCurrency(customer.balance)}</p>
-                  <button className="mt-4 text-xs font-bold text-primary flex items-center gap-1 hover:underline group-hover:text-primary-container transition-colors">
-                    Ver historial completo
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                  </button>
                 </div>
               </div>
             );
           }
 
-          /* ==========================================================
-             VARIANTE 2: Tarjeta Normal
-             ========================================================== */
+          /* TARJETA NORMAL */
           return (
             <div 
               key={customer.id} 
@@ -315,11 +312,10 @@ export default function CustomersPage() {
                 </div>
                 
                 <div className="flex items-center gap-2">
-                  {/* Etiqueta de Estatus Dinámica */}
                   {hasDebt ? (
                     <div className="bg-tertiary-container/10 px-3 py-1 rounded-full flex items-center gap-1">
                       <AlertCircle className="w-3 h-3 text-on-tertiary-fixed-variant" />
-                      <span className="text-[10px] font-bold text-on-tertiary-fixed-variant uppercase tracking-wider">Deuda Pendiente</span>
+                      <span className="text-[10px] font-bold text-on-tertiary-fixed-variant uppercase tracking-wider">Deuda</span>
                     </div>
                   ) : (
                     <div className="bg-secondary/10 px-3 py-1 rounded-full flex items-center gap-1">
@@ -328,7 +324,7 @@ export default function CustomersPage() {
                     </div>
                   )}
 
-                  {/* Acciones de Tarjeta CRUD */}
+                  {/* Acciones CRUD */}
                   <div className="flex items-center bg-surface-container-low rounded-full opacity-10 md:opacity-0 group-hover:opacity-100 transition-opacity">
                     <button onClick={() => handleOpenEditModal(customer)} className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container-low rounded-xl transition-colors" title="Editar">
                       <Edit className="w-3.5 h-3.5" />
@@ -341,8 +337,21 @@ export default function CustomersPage() {
               </div>
               
               <div className="flex-1">
-                <h3 className="text-xl font-bold mb-1 text-on-surface font-[var(--font-manrope)]">{customer.name}</h3>
-                <div className="flex flex-col gap-1 text-on-surface-variant mb-6">
+                <h3 className="text-xl font-bold text-on-surface font-[var(--font-manrope)]">{customer.name}</h3>
+                
+                {/* Indicadores Dinámicos */}
+                <div className="flex flex-wrap items-center gap-2 my-2">
+                  {!customer.allowContainerLoan && (
+                    <span className="px-2 py-0.5 text-[9px] uppercase tracking-widest font-black rounded-sm border border-orange-500/20 text-orange-600 bg-orange-500/10">No Fía Envases</span>
+                  )}
+                  {customer.borrowedContainers > 0 && (
+                    <span className="flex items-center gap-1 text-on-surface-variant font-bold text-xs bg-surface-container-low px-2 py-1 rounded-md">
+                      <Package className="w-3.5 h-3.5 text-primary/70" /> {customer.borrowedContainers} en préstamo
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-col gap-1 text-on-surface-variant mb-6 mt-3">
                   <div className="flex items-center gap-2">
                     <MapPin className="w-4 h-4 shrink-0" />
                     <span className="text-sm font-medium line-clamp-1">{customer.address}</span>
@@ -386,7 +395,7 @@ export default function CustomersPage() {
               </div>
             )}
             
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1.5 border-b border-outline-variant/30 pb-4">
               <label htmlFor="name" className="text-xs font-bold uppercase tracking-wider text-on-surface-variant">Nombre y Apellido</label>
               <input 
                 id="name"
@@ -418,6 +427,23 @@ export default function CustomersPage() {
                 placeholder="Ej. +593 99 123 4567"
               />
             </div>
+
+            {/* TOGGLE PERMITIR PRÉSTAMO */}
+            <div className="mt-2 bg-surface-container-low border border-outline-variant/30 p-4 rounded-xl flex items-center justify-between">
+              <div>
+                <p className="font-bold text-on-surface text-sm">Permitir préstamo de envases</p>
+                <p className="text-xs text-on-surface-variant font-medium mt-0.5">Si se apaga, los faltantes se cobrarán automáticamente en la ruta.</p>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer ml-4">
+                <input 
+                  type="checkbox" 
+                  className="sr-only peer"
+                  checked={newAllowContainerLoan}
+                  onChange={(e) => setNewAllowContainerLoan(e.target.checked)}
+                />
+                <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary"></div>
+              </label>
+            </div>
           </div>
 
           <DialogFooter className="sm:justify-end gap-3 mt-4">
@@ -431,8 +457,8 @@ export default function CustomersPage() {
               onClick={handleSaveForm}
               className="px-6 py-2.5 rounded-full text-sm font-bold text-white signature-gradient shadow-lg shadow-primary/20 hover:shadow-primary/40 active:scale-95 transition-all flex items-center justify-center gap-2"
             >
-              {editingCustomer ? <Edit className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
-              {editingCustomer ? "Guardar Cambios" : "Guardar Cliente"}
+              <UserPlus className="w-4 h-4" />
+              Guardar Cliente
             </button>
           </DialogFooter>
         </DialogContent>

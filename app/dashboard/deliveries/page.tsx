@@ -9,22 +9,25 @@ interface Customer {
   address: string;
   phone: string;
   balance: number;
+  borrowedContainers: number;
+  allowContainerLoan: boolean;
 }
 
-// Interfaz para Entregas (Historial)
 interface Delivery {
   id: number;
   customerId: number;
   customerName: string;
   delivered: number;
   returned: number;
-  price: number;
+  missing: number;
   total: number;
   date: string;
+  usedLoan: boolean;
 }
 
 const STORAGE_KEY = "@hydroflow_customers";
 const DELIVERIES_STORAGE_KEY = "@hydroflow_deliveries";
+const CONTAINER_PRICE = 10; // Precio de cobro por envase hardcodeado por requerimiento actual
 
 export default function DeliveriesPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -68,7 +71,7 @@ export default function DeliveriesPage() {
     }
   }, []);
 
-  // Actualizar LocalStorage de entregas cuando existan nuevas
+  // Actualizar LocalStorage cuando algo cambie
   useEffect(() => {
     if (isMounted) {
       localStorage.setItem(DELIVERIES_STORAGE_KEY, JSON.stringify(deliveries));
@@ -79,13 +82,28 @@ export default function DeliveriesPage() {
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
   // ==============================
-  // CÁLCULO EN TIEMPO REAL
+  // LÓGICA DE NEGOCIO EN VIVO
   // ==============================
   const safeDelivered = Number(delivered) || 0;
   const safeReturned = Number(returned) || 0;
   const safePrice = Number(price) || 0;
   
-  const total = Math.max(0, (safeDelivered - safeReturned) * safePrice);
+  const missing = Math.max(safeDelivered - safeReturned, 0);
+  
+  const isLoanAllowed = selectedCustomer ? selectedCustomer.allowContainerLoan : true;
+  
+  let total = 0;
+  let chargingContainers = false;
+
+  if (isLoanAllowed) {
+    // Si permite préstamo: solo se cobra el costo del agua entregada
+    total = safeDelivered * safePrice;
+    chargingContainers = false;
+  } else {
+    // Si NO permite préstamo: se cobra el agua entregada + penalidad por envases faltantes
+    total = (safeDelivered * safePrice) + (missing * CONTAINER_PRICE);
+    chargingContainers = missing > 0;
+  }
 
   // ==============================
   // VALIDACIÓN DE FORMULARIO
@@ -95,7 +113,7 @@ export default function DeliveriesPage() {
     safeDelivered > 0 &&         
     safePrice > 0 &&            
     safeReturned >= 0 &&
-    safeDelivered >= safeReturned; // Nueva regla solicitada
+    safeReturned <= safeDelivered; // No puede devolver más de lo entregado
 
   // ==============================
   // FUNCIONAMIENTO CRUD Y GUARDADO
@@ -103,35 +121,38 @@ export default function DeliveriesPage() {
   const handleSave = () => {
     if (!selectedCustomer || !isValid) return;
 
-    // 1. Crear el registro en el Historial de Entregas
+    // 1. Crear Objeto Delivery
     const newDelivery: Delivery = {
       id: Date.now(),
       customerId: selectedCustomer.id,
       customerName: selectedCustomer.name,
       delivered: safeDelivered,
       returned: safeReturned,
-      price: safePrice,
+      missing: missing,
       total: total,
-      date: new Date().toISOString()
+      date: new Date().toISOString(),
+      usedLoan: isLoanAllowed
     };
 
     setDeliveries(prev => [newDelivery, ...prev]);
     console.log("Entrega guardada", newDelivery);
 
-    // 2. Sumar el "total" a la deuda del cliente en memoria
+    // 2. Sumar el "total" a la deuda del cliente en memoria y actualizar préstamos
     const updatedCustomers = customers.map(c => {
       if (c.id === selectedCustomerId) {
         return {
           ...c,
           balance: c.balance + total,
+          // Solo se aumentan envases prestados si su cuenta lo permite. Si se los cobraron directos, no se fiaron.
+          borrowedContainers: isLoanAllowed ? c.borrowedContainers + missing : c.borrowedContainers
         };
       }
       return c;
     });
     setCustomers(updatedCustomers);
 
-    // Desplegar Mensaje de Éxito
-    setSuccessMsg(`¡Entrega por $${total.toFixed(2)} registrada a ${selectedCustomer.name}!`);
+    // Mensaje de éxito
+    setSuccessMsg(`¡Entrega verificada y guardada para ${selectedCustomer.name}!`);
     setTimeout(() => setSuccessMsg(""), 4000);
 
     // Reset Formulario
@@ -140,7 +161,7 @@ export default function DeliveriesPage() {
     setReturned(0);
   };
 
-  // Formateador de Fecha legible
+  // Formateador de Fecha requerido ("27 Mar - 14:30")
   const formatDate = (isoStr: string) => {
     const d = new Date(isoStr);
     const months = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -151,8 +172,12 @@ export default function DeliveriesPage() {
     return `${day} ${month} - ${hours}:${mins}`;
   }
 
+  // Formateador de moneda en estándar de Ecuador
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+    return amount.toLocaleString("es-EC", {
+      style: "currency",
+      currency: "USD"
+    });
   };
 
   if (!isMounted) return null;
@@ -166,7 +191,7 @@ export default function DeliveriesPage() {
           Registrar Entrega
         </h1>
         <p className="text-on-surface-variant font-medium">
-          Reporta bidones en ruta y suma el cobro automáticamente a la cartera del cliente.
+          Reporta rutas y actualiza el saldo o préstamo automáticamente.
         </p>
       </div>
 
@@ -203,7 +228,7 @@ export default function DeliveriesPage() {
                   <option value="" disabled>Seleccione cliente del listado</option>
                   {customers.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} {c.balance > 0 ? `(Deuda actual: ${formatCurrency(c.balance)})` : "(Al día)"}
+                      {c.name} {c.balance > 0 ? `(Deuda actual: ${formatCurrency(c.balance)})` : ""}
                     </option>
                   ))}
                 </select>
@@ -212,6 +237,21 @@ export default function DeliveriesPage() {
                 </div>
               </div>
             </div>
+
+            {/* FEEDBACK DINÁMICO DEL CLIENTE SELECCIONADO */}
+            {selectedCustomer && (
+              <div className="flex items-center gap-2 bg-surface-container my-2 p-3 rounded-lg border border-outline-variant/30 text-sm font-medium">
+                {selectedCustomer.allowContainerLoan ? (
+                  <span className="text-primary flex items-center gap-2">
+                     <CheckCircle2 className="w-4 h-4" /> Cliente con préstamo de envases habilitado.
+                  </span>
+                ) : (
+                  <span className="text-orange-600 flex items-center gap-2">
+                     <AlertCircle className="w-4 h-4" /> Envases faltantes se cobrarán en esta tarjeta (${CONTAINER_PRICE} c/u).
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* INPUTS 2: CAJAS NUMÉRICAS */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -229,7 +269,7 @@ export default function DeliveriesPage() {
                 />
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 relative">
                 <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
                   <Package className="w-4 h-4 text-orange-500" /> Envases Recogidos
                 </label>
@@ -238,11 +278,15 @@ export default function DeliveriesPage() {
                   min="0"
                   placeholder="Ej. 2"
                   value={returned}
-                  onChange={(e) => setReturned(e.target.value === "" ? "" : Number(e.target.value))}
-                  className={`flex h-12 w-full rounded-xl border bg-surface-container-low px-4 py-2 text-lg font-bold placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${safeReturned > safeDelivered ? 'border-error focus:ring-error text-error' : 'border-outline-variant'}`}
+                  onChange={(e) => {
+                     // Solo evitamos el negativo aquí, el overflow se valida en el boton
+                    const val = e.target.value;
+                    if (val === "" || Number(val) >= 0) setReturned(val === "" ? "" : Number(val));
+                  }}
+                  className={`flex h-12 w-full rounded-xl border bg-surface-container-low px-4 py-2 text-lg font-bold placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary transition-all ${safeReturned > safeDelivered ? 'border-error focus:ring-error text-error' : 'border-outline-variant focus:border-transparent'}`}
                 />
-                {safeReturned > safeDelivered && (
-                   <span className="text-xs text-error font-bold absolute -bottom-5 right-1">No puedes recoger más de lo que entregas</span>
+                {(safeReturned > safeDelivered) && (
+                   <span className="text-[10px] text-error font-bold absolute -bottom-4 right-1">Imposible recoger más de lo entregado</span>
                 )}
               </div>
             </div>
@@ -251,7 +295,7 @@ export default function DeliveriesPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end mt-4">
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" /> Tarifa Unitaria
+                  <DollarSign className="w-4 h-4" /> Tarifa por recarga
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 font-bold text-on-surface-variant">$</span>
@@ -266,13 +310,28 @@ export default function DeliveriesPage() {
                 </div>
               </div>
 
-              {/* Pantalla Reactiva de Cálculo (Total Neto) */}
-              <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 flex flex-col items-end justify-center h-[72px]">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-primary/80">Neto a Cobrar</span>
-                <span className="text-2xl font-black text-primary font-[var(--font-manrope)] leading-none mt-1">
-                  ${total.toFixed(2)}
+              {/* Pantalla Reactiva de Cálculo (Total Neto Modificado) */}
+              <div className={`border rounded-xl p-4 flex flex-col items-end justify-center h-[72px] transition-colors ${chargingContainers ? 'bg-orange-500/10 border-orange-500/30' : 'bg-primary/5 border-primary/20'}`}>
+                <span className={`text-[10px] font-bold uppercase tracking-widest ${chargingContainers ? 'text-orange-700' : 'text-primary/80'}`}>Total a Cobrar</span>
+                <span className={`text-2xl font-black font-[var(--font-manrope)] leading-none mt-1 ${chargingContainers ? 'text-orange-700' : 'text-primary'}`}>
+                  {formatCurrency(total)}
                 </span>
               </div>
+            </div>
+
+            {/* EXPLICADOR DINÁMICO ARRIBA DEL BOTÓN */}
+            <div className="flex flex-col items-center justify-center -mb-2 mt-4 text-sm font-medium">
+               {selectedCustomer && missing > 0 ? (
+                 isLoanAllowed ? (
+                   <span className="bg-primary/10 text-primary px-4 py-1.5 rounded-full font-bold">
+                     Envases a prestar: {missing}
+                   </span>
+                 ) : (
+                   <span className="bg-orange-500/10 text-orange-600 px-4 py-1.5 rounded-full font-bold">
+                     Envases a cobrar: {missing} (Total costo extra: {formatCurrency(missing * CONTAINER_PRICE)})
+                   </span>
+                 )
+               ) : null}
             </div>
 
             <hr className="border-outline-variant/30 my-4" />
@@ -306,11 +365,11 @@ export default function DeliveriesPage() {
           
           <div className="flex flex-col gap-4">
             {deliveries.map(delivery => (
-              <div key={delivery.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 hover:border-primary/30 transition-colors">
+              <div key={delivery.id} className="bg-surface-container-lowest p-5 rounded-2xl shadow-sm border border-outline-variant/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 hover:border-primary/30 transition-colors relative overflow-hidden">
                 
                 {/* Lado Izquierdo: Cliente y Fecha */}
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1.5">
+                <div className="flex-1 w-full">
+                  <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                     <h3 className="font-bold text-lg text-on-surface font-[var(--font-manrope)]">{delivery.customerName}</h3>
                     {delivery.total > 0 ? (
                       <span className="px-2 py-0.5 bg-tertiary/10 text-tertiary-hover text-[10px] font-bold rounded-full border border-tertiary/20 uppercase tracking-widest">
@@ -326,10 +385,18 @@ export default function DeliveriesPage() {
                     <CheckCircle2 className="w-3.5 h-3.5 text-secondary" /> 
                     Completado el {formatDate(delivery.date)}
                   </p>
+
+                  <div className="mt-2.5">
+                     {delivery.missing > 0 && (
+                       delivery.usedLoan 
+                         ? <span className="text-[10px] font-bold uppercase bg-surface-container px-2 py-1 rounded bg-primary/5 text-primary">Prestados {delivery.missing} envases</span>
+                         : <span className="text-[10px] font-bold uppercase bg-surface-container px-2 py-1 rounded bg-orange-500/10 text-orange-600">Cobrados {delivery.missing} envases faltantes</span>
+                     )}
+                  </div>
                 </div>
 
                 {/* Centro: Resumen de Cajas (Bidones) */}
-                <div className="flex items-center gap-4 bg-surface-container-low px-4 py-3 rounded-xl w-full sm:w-auto self-stretch sm:self-auto">
+                <div className="flex items-center gap-4 bg-surface-container-low px-4 py-3 rounded-xl w-full sm:w-auto mt-2 sm:mt-0">
                   <div className="flex flex-col items-center min-w-[3rem]">
                     <span className="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/80 mb-1">Entregó</span>
                     <span className="font-black text-on-surface flex items-center gap-1.5">
@@ -348,8 +415,8 @@ export default function DeliveriesPage() {
                 </div>
 
                 {/* Lado Derecho: Precio final */}
-                <div className="flex flex-col items-start sm:items-end bg-surface-container-low sm:bg-transparent p-4 sm:p-0 rounded-xl w-full sm:w-auto">
-                  <span className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest mb-0.5">Cobro Neto</span>
+                <div className="flex flex-col items-start sm:items-end bg-surface-container-low sm:bg-transparent p-4 sm:p-0 rounded-xl w-full sm:w-auto mt-2 sm:mt-0">
+                  <span className="text-[10px] uppercase font-bold text-on-surface-variant tracking-widest mb-0.5">Total a cobrar</span>
                   <span className={`text-2xl font-black font-[var(--font-manrope)] leading-none ${delivery.total > 0 ? 'text-tertiary' : 'text-secondary'}`}>
                     {formatCurrency(delivery.total)}
                   </span>

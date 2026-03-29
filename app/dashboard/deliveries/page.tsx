@@ -135,7 +135,6 @@ export default function DeliveriesPage() {
     };
 
     setDeliveries(prev => [newDelivery, ...prev]);
-    console.log("Entrega guardada", newDelivery);
 
     // 2. Sumar el "total" a la deuda del cliente en memoria y actualizar préstamos
     const updatedCustomers = customers.map(c => {

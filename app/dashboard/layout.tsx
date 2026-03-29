@@ -102,10 +102,13 @@ export default function DashboardLayout({
             </Link>
 
             <Link
-              href="#"
-              className="flex items-center gap-3 px-4 py-3 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/80 rounded-xl transition-all duration-300 ease-in-out"
+              href="/dashboard/payments"
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 ease-in-out ${isActive("/dashboard/payments")
+                ? "bg-white dark:bg-slate-800 text-blue-700 dark:text-blue-300 shadow-sm"
+                : "text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/80"
+                }`}
             >
-              <Banknote className="w-5 h-5" />
+              <Banknote className={`w-5 h-5 ${isActive("/dashboard/payments") ? "fill-blue-700/20" : ""}`} />
               <span className="font-medium text-sm">Cobros</span>
             </Link>
 
@@ -171,10 +174,11 @@ export default function DashboardLayout({
           <span className="text-[10px] font-semibold uppercase tracking-wider mt-1">Entregas</span>
         </Link>
         <Link
-          href="#"
-          className="flex flex-col items-center justify-center text-slate-400 dark:text-slate-500 px-3 py-2 tap-highlight-transparent scale-90 active:scale-100 transition-transform"
+          href="/dashboard/payments"
+          className={`flex flex-col items-center justify-center px-3 py-2 tap-highlight-transparent scale-90 active:scale-100 transition-transform ${isActive("/dashboard/payments") ? "bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-2xl" : "text-slate-400 dark:text-slate-500"
+            }`}
         >
-          <Banknote className="w-6 h-6" />
+          <Banknote className={`w-6 h-6 ${isActive("/dashboard/payments") ? "fill-blue-700/20" : ""}`} />
           <span className="text-[10px] font-semibold uppercase tracking-wider mt-1">Cobros</span>
         </Link>
         <Link

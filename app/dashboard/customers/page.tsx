@@ -157,6 +157,40 @@ export default function CustomersPage() {
   const handleDeleteCustomer = (id: number, name: string) => {
     const isConfirmed = window.confirm(`¿Estás seguro de que deseas eliminar permanentemente a "${name}"?`);
     if (isConfirmed) {
+      const customerToDel = customers.find(c => c.id === id);
+      
+      // REGla CRÍTICA DE INVENTARIO:
+      // Si el cliente tiene envases prestados al momento de eliminarlo, se debe reabsorber el físico a vacíos de planta
+      // para no corromper la cantidad de materia prima de la empresa.
+      if (customerToDel && customerToDel.borrowedContainers > 0) {
+        const invRaw = localStorage.getItem("@hydroflow_inventory");
+        if (invRaw) {
+          try {
+            const inv = JSON.parse(invRaw);
+            inv.empty += customerToDel.borrowedContainers;
+            localStorage.setItem("@hydroflow_inventory", JSON.stringify(inv));
+            
+            // Logear auto-return
+            const movsRaw = localStorage.getItem("@hydroflow_inventory_movements");
+            let movs = [];
+            if (movsRaw) movs = JSON.parse(movsRaw);
+            
+            movs.unshift({
+              id: Date.now(),
+              type: "adjustment",
+              fullChange: 0,
+              emptyChange: customerToDel.borrowedContainers,
+              affectsTotal: false, // Total = F+E+B. B bajó, E subió. Conserva la materia.
+              reference: `Retorno forzado por eliminación de ${name}`,
+              date: new Date().toISOString()
+            });
+            localStorage.setItem("@hydroflow_inventory_movements", JSON.stringify(movs));
+          } catch (e) {
+            console.error(e);
+          }
+        }
+      }
+
       setCustomers(prev => prev.filter(c => c.id !== id));
     }
   };

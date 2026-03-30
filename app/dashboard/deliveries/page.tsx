@@ -27,6 +27,8 @@ interface Delivery {
 
 const STORAGE_KEY = "@hydroflow_customers";
 const DELIVERIES_STORAGE_KEY = "@hydroflow_deliveries";
+const INVENTORY_KEY = "@hydroflow_inventory";
+const MOVEMENTS_KEY = "@hydroflow_inventory_movements";
 const CONTAINER_PRICE = 10; // Precio de cobro por envase hardcodeado por requerimiento actual
 
 export default function DeliveriesPage() {
@@ -41,8 +43,12 @@ export default function DeliveriesPage() {
   const [delivered, setDelivered] = useState<number | "">("");
   const [returned, setReturned] = useState<number | "">(0);
   const [price, setPrice] = useState<number | "">(3.5);
+
+  const [inventory, setInventory] = useState<{full: number, empty: number, reservedForNextDay: number, total: number}>({full: 0, empty: 0, reservedForNextDay: 0, total: 0});
+  const [movements, setMovements] = useState<any[]>([]);
   
   const [successMsg, setSuccessMsg] = useState("");
+  const [errorMsg, setErrorMsg] = useState("");
 
   // ==============================
   // CARGA DE DATOS (Mount)
@@ -69,6 +75,18 @@ export default function DeliveriesPage() {
         setDeliveries([]);
       }
     }
+
+    // Cargar Inventario
+    const storedInventory = localStorage.getItem(INVENTORY_KEY);
+    if (storedInventory) {
+      try { setInventory(JSON.parse(storedInventory)); } catch (e) {}
+    }
+
+    // Cargar Historial Inventario
+    const storedMovements = localStorage.getItem(MOVEMENTS_KEY);
+    if (storedMovements) {
+      try { setMovements(JSON.parse(storedMovements)); } catch (e) {}
+    }
   }, []);
 
   // Actualizar LocalStorage cuando algo cambie
@@ -76,8 +94,10 @@ export default function DeliveriesPage() {
     if (isMounted) {
       localStorage.setItem(DELIVERIES_STORAGE_KEY, JSON.stringify(deliveries));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(customers));
+      localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
+      localStorage.setItem(MOVEMENTS_KEY, JSON.stringify(movements));
     }
-  }, [deliveries, customers, isMounted]);
+  }, [deliveries, customers, inventory, movements, isMounted]);
 
   const selectedCustomer = customers.find(c => c.id === selectedCustomerId);
 
@@ -108,18 +128,30 @@ export default function DeliveriesPage() {
   // ==============================
   // VALIDACIÓN DE FORMULARIO
   // ==============================
+  const maxReturnable = selectedCustomer ? selectedCustomer.borrowedContainers + safeDelivered : safeDelivered;
+
   const isValid = 
     selectedCustomerId !== "" && 
-    safeDelivered > 0 &&         
-    safePrice > 0 &&            
+    (safeDelivered > 0 || safeReturned > 0) &&         
+    safePrice >= 0 &&            
     safeReturned >= 0 &&
-    safeReturned <= safeDelivered; // No puede devolver más de lo entregado
+    safeReturned <= maxReturnable;
 
   // ==============================
   // FUNCIONAMIENTO CRUD Y GUARDADO
   // ==============================
   const handleSave = () => {
+    setErrorMsg("");
     if (!selectedCustomer || !isValid) return;
+
+    // VALIDACIÓN ESTRICTA MÁQUINA DE ESTADO
+    const usableStock = (inventory.full || 0) + (inventory.reservedForNextDay || 0);
+
+    if (safeDelivered > usableStock) {
+      setErrorMsg(`No tienes suficientes botellones disponibles (Max: ${usableStock}). Registra una recarga en planta antes de continuar.`);
+      setTimeout(() => setErrorMsg(""), 6000);
+      return;
+    }
 
     // 1. Crear Objeto Delivery
     const newDelivery: Delivery = {
@@ -142,13 +174,49 @@ export default function DeliveriesPage() {
         return {
           ...c,
           balance: c.balance + total,
-          // Solo se aumentan envases prestados si su cuenta lo permite. Si se los cobraron directos, no se fiaron.
-          borrowedContainers: isLoanAllowed ? c.borrowedContainers + missing : c.borrowedContainers
+          // Regla inquebrantable de negocio: Los envases SOLO cambian mediante movimientos físicos en entregas.
+          // El pago no altera el mundo físico. Si hay desfase de envase, pasa a prestado físico para mantener la invariante total.
+          borrowedContainers: Math.max(0, c.borrowedContainers + (safeDelivered - safeReturned))
         };
       }
       return c;
     });
     setCustomers(updatedCustomers);
+
+    // 3. Modificar Inventario Físico Central como Máquina de Estado
+    const prevFull = inventory.full || 0;
+    const prevReserved = inventory.reservedForNextDay || 0;
+    const newEmpty = inventory.empty + safeReturned; // Entrada de vacíos devueltos
+
+    let newFull = prevFull;
+    let newReserved = prevReserved;
+
+    // 1. Consumir llenos disponibles (hasta agotar)
+    const usedFromFull = Math.min(newFull, safeDelivered);
+    newFull -= usedFromFull;
+    const remainingToConsume = safeDelivered - usedFromFull;
+
+    // 2. Si falta, consumir reserva del siguiente turno (La validación inicial asegura que esto alcance)
+    newReserved -= remainingToConsume;
+
+    setInventory({
+      full: newFull,
+      empty: newEmpty,
+      reservedForNextDay: newReserved,
+      total: inventory.total
+    });
+
+    const type = isLoanAllowed ? "delivery_internal" : "delivery_external";
+    const newInvMovement = {
+      id: Date.now() + 1,
+      type,
+      fullChange: -safeDelivered,
+      emptyChange: safeReturned,
+      affectsTotal: !isLoanAllowed && missing > 0, // Altera global solo si pagó por plástico nuevo (missing > 0)
+      reference: `Entrega a ${selectedCustomer.name}`,
+      date: new Date().toISOString()
+    };
+    setMovements(prev => [newInvMovement, ...prev]);
 
     // Mensaje de éxito
     setSuccessMsg(`¡Entrega verificada y guardada para ${selectedCustomer.name}!`);
@@ -201,6 +269,20 @@ export default function DeliveriesPage() {
           <div className="mb-6 bg-secondary/10 text-secondary-container-hover text-sm p-4 rounded-xl flex items-center gap-3 font-bold animate-in fade-in slide-in-from-top-4">
             <CheckCircle2 className="w-5 h-5 shrink-0" />
             {successMsg}
+          </div>
+        )}
+
+        {errorMsg && (
+          <div className="mb-6 bg-error-container text-on-error-container text-sm p-4 rounded-xl flex items-center justify-between gap-3 font-bold animate-in fade-in slide-in-from-top-4">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+            {errorMsg.includes("recarga") && (
+               <a href="/dashboard/inventory" className="shrink-0 bg-error text-white px-3 py-1.5 rounded-lg text-xs hover:bg-error/90 transition-colors shadow-sm">
+                  Ir a Recargar
+               </a>
+            )}
           </div>
         )}
 
@@ -260,7 +342,7 @@ export default function DeliveriesPage() {
                 </label>
                 <input
                   type="number"
-                  min="1"
+                  min="0"
                   placeholder="Ej. 10"
                   value={delivered}
                   onChange={(e) => setDelivered(e.target.value === "" ? "" : Number(e.target.value))}
@@ -282,10 +364,10 @@ export default function DeliveriesPage() {
                     const val = e.target.value;
                     if (val === "" || Number(val) >= 0) setReturned(val === "" ? "" : Number(val));
                   }}
-                  className={`flex h-12 w-full rounded-xl border bg-surface-container-low px-4 py-2 text-lg font-bold placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary transition-all ${safeReturned > safeDelivered ? 'border-error focus:ring-error text-error' : 'border-outline-variant focus:border-transparent'}`}
+                  className={`flex h-12 w-full rounded-xl border bg-surface-container-low px-4 py-2 text-lg font-bold placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-2 focus:ring-primary transition-all ${safeReturned > maxReturnable ? 'border-error focus:ring-error text-error' : 'border-outline-variant focus:border-transparent'}`}
                 />
-                {(safeReturned > safeDelivered) && (
-                   <span className="text-[10px] text-error font-bold absolute -bottom-4 right-1">Imposible recoger más de lo entregado</span>
+                {(safeReturned > maxReturnable) && (
+                   <span className="text-[10px] text-error font-bold absolute -bottom-4 right-1">Supera el límite permitido (Prestados + Entregados)</span>
                 )}
               </div>
             </div>

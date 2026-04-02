@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
 
-First, run the development server:
+🚀 Inventario App – Distribución de Agua
 
-```bash
+📌 Descripción
+
+Este proyecto es una aplicación de inventario desarrollada para un negocio real de distribución de garrafones de agua.
+
+Surge a partir de una necesidad concreta: mejorar el control del stock, reducir errores en las entregas y optimizar la gestión del negocio.
+
+Más allá de ser un proyecto académico, esta aplicación está pensada para ser utilizada en un entorno real.
+
+🎯 Problema
+
+Muchos negocios pequeños gestionan su inventario de manera manual o poco estructurada, utilizando:
+	•	Cuadernos
+	•	Hojas de Excel desorganizadas
+	•	O simplemente la memoria
+
+Esto genera problemas como:
+	•	Pérdida de productos
+	•	Desorden en el stock
+	•	Errores en entregas
+	•	Falta de control sobre entradas y salidas
+
+💡 Solución
+
+Esta aplicación busca digitalizar y simplificar la gestión del inventario mediante:
+	•	📦 Registro de entradas y salidas de productos
+	•	📊 Control de stock en tiempo real
+	•	🧾 Organización clara de la información
+	•	👥 (En desarrollo) Gestión de clientes
+	•	🚚 (En desarrollo) Seguimiento de pedidos
+
+🛠️ Tecnologías utilizadas
+	•	Next.js
+	•	React
+	•	Node.js
+	•	(Opcional: agrega aquí Tailwind, Prisma, etc.)
+
+⚙️ Instalación y ejecución
+
+Clona el repositorio:
+
+git clone https://github.com/tu-usuario/inventario-app.git
+
+Ingresa al proyecto:
+
+cd inventario-app
+
+Instala las dependencias:
+
+npm install
+
+Ejecuta el servidor de desarrollo:
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre en tu navegador:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+👉 http://localhost:3000
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+📌 Estado del proyecto
 
-## Learn More
+🚧 En desarrollo
 
-To learn more about Next.js, take a look at the following resources:
+Actualmente se están implementando funcionalidades clave para lograr un sistema completo de gestión de inventario.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+📷 Capturas de pantalla
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+<img width="1600" height="900" alt="Captura de pantalla 2026-04-01 a las 22 19 00" src="https://github.com/user-attachments/assets/036013f8-41ed-4794-a203-310de2a03153" />
+<img width="1600" height="900" alt="Captura de pantalla 2026-04-01 a las 22 16 11" src="https://github.com/user-attachments/assets/ade183c8-f01b-4ed0-9b32-f2c0110f7731" />
+<img width="1600" height="900" alt="Captura de pantalla 2026-04-01 a las 22 16 49" src="https://github.com/user-attachments/assets/d93fc98f-7f18-4e5c-a6e2-6c03d2244990" />
 
-## Deploy on Vercel
+🧠 Aprendizajes
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Este proyecto forma parte de mi proceso de formación en desarrollo de software, donde estoy:
+	•	Aplicando conceptos de frontend y backend
+	•	Trabajando con un caso real
+	•	Enfocándome en resolver problemas concretos
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+🚀 Próximas mejoras
+	•	Sistema de autenticación
+	•	Gestión completa de clientes
+	•	Historial de movimientos
+	•	Reportes y estadísticas
+	•	Deploy en producción
+
+🤝 Contribuciones
+
+Las sugerencias, ideas o mejoras son bienvenidas.
+
+Si deseas contribuir, puedes hacer un fork del repositorio o abrir un issue.
+
+📬 Contacto
+
+Si te interesa el proyecto o quieres colaborar, puedes encontrarme en LinkedIn.
+
+
+⭐ Si este proyecto te parece interesante, puedes darle una estrella en el repositorio.
+:::
+
+
